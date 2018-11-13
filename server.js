@@ -3,6 +3,10 @@
 // Load array of notes
 const data = require('./db/notes');
 
+const simDB = require('./db/simDB');  
+
+const notes = simDB.initialize(data);
+
 console.log('Hello Noteful!');
 
 // INSERT EXPRESS APP CODE HERE...
@@ -13,15 +17,25 @@ const app = express();
 // ADD STATIC SERVER HERE
 app.use(express.static('public'));
 
+app.use(express.json());
+
+// grab the config file export
+const {logger} = require('./logger');
+
+const {PORT} = require('./config');
+
+app.use(logger);
+
 app.get("/api/notes", (req, res) => {
-    const query = req.query;
-    if (query.searchTerm) {
-    return res.json(data.filter(item => item.title.includes(query.searchTerm)));
-    }else{
-        res.json(data);
+    const { searchTerm } = req.query;
+
+  notes.filter(searchTerm, (err, list) => {
+    if (err) {
+      return next(err); // goes to error handler
     }
-    //res.json(data.filter(item => item.title.indexOf(query.searchTerm) > -1));
+    res.json(list); // responds with filtered array
   });
+});
 
 app.get("/api/notes/:id", (req, res) => {
     res.json(data.find(item => item.id === Number(req.params.id)));
@@ -29,9 +43,53 @@ app.get("/api/notes/:id", (req, res) => {
 
 
 
+app.put('/api/notes/:id',(req,res,next)=>{
 
-app.listen(8080, function () {
-  console.info(`Server listening on ${this.address().port}`);
+  const id = req.params.id;
+
+  /***** Never trust users - validate input *****/
+  const updateObj = {};
+  const updateFields = ['title', 'content'];
+
+  updateFields.forEach(field => {
+    if (field in req.body) {
+      updateObj[field] = req.body[field];
+    }
+  });
+
+  notes.update(id, updateObj, (err, item) => {
+    if (err) {
+      return next(err);
+    }
+    if (item) {
+      res.json(item);
+    } else {
+      next();
+    }
+  });
+
+});
+
+app.get('/boom', (req, res, next) => {
+  throw new Error('Boom!!');
+});
+
+app.use(function (req, res, next) {
+  var err = new Error('Not Found');
+  err.status = 404;
+  res.status(404).json({ message: 'Not Found' });
+});
+
+app.use(function (err, req, res, next) {
+  res.status(err.status || 500);
+  res.json({
+    message: err.message,
+    error: err
+  });
+});
+
+app.listen(PORT, function () {
+  console.info(`Server listening on ${PORT}`);
 }).on('error', err => {
   console.error(err);
 });
