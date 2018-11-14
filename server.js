@@ -21,7 +21,7 @@ app.use(express.json());
 
 // grab the config file export
 const {logger} = require('./logger');
-
+const {checker} = require('./checker');
 const {PORT} = require('./config');
 
 app.use(logger);
